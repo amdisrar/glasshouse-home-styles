@@ -26,7 +26,17 @@ These come with every style, including Glasshouse's own tiles:
 
 - An LG TV rooted with the Homebrew Channel, with SSH access as root.
 - [Glasshouse](https://github.com/rorygallagher2024/glasshouse) installed, with Glasshouse Home switched on.
-- Tested on webOS 10. Other versions have not been tried.
+- Tested on one TV only (see [Tested on](#tested-on)). Other models and webOS versions have not been tried.
+
+## Tested on
+
+| | |
+| --- | --- |
+| TV | LG 55NANO776RA (55", NanoCell) |
+| webOS | webOS TV Lite 10.3.2 (build 33, August 2026) |
+| Firmware | 33.31.75 |
+
+If it works, or doesn't, on another model, please open an issue with the model and webOS version.
 
 ## Install
 
