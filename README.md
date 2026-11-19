@@ -8,6 +8,8 @@ Three new looks for the Apps row of [Glasshouse](https://github.com/rorygallaghe
 
 The **Glasshouse Home** card keeps Glasshouse's own tiles.
 
+![The three styles as launcher cards on the Glasshouse dashboard](screenshots/dashboard-launchers.png)
+
 This is an unofficial add-on, not part of Glasshouse and not made by its developer. It patches Glasshouse Home's page and dashboard on the TV, so a Glasshouse update removes it until you run the installer again (see below).
 
 ## What else it changes
