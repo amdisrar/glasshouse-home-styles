@@ -97,6 +97,20 @@ After changing a file, copy it to `/home/root/lg-tiles/` on the TV and run `sh l
 
 The chosen style is saved in Glasshouse's own settings, so it survives restarts and updates.
 
+## Screenshots
+
+**Lens**
+
+![lens screenshot](screenshots/lens.jpg)
+
+**Orbit**
+
+![lens screenshot](screenshots/orbit.jpg)
+
+**Tilted Tiles**
+
+![lens screenshot](screenshots/tiles.jpg)
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Glasshouse itself is MIT-licensed, by Rory Gallagher.
