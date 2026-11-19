@@ -1,0 +1,111 @@
+<style id="lg-dash">
+/* Eight launcher cards fit better as two rows of four. */
+#home-mode-btns{grid-auto-flow:row;grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:560px){#home-mode-btns{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.lg-prev{position:absolute;inset:0;width:100%;height:100%}
+</style>
+<script>
+// Glasshouse Home's tile styles as launcher cards beside Glasshouse Home.
+// The choice is kept in Glasshouse's own settings (an app-name entry no app
+// uses), which Glasshouse Home reads with its catalogue.
+(function () {
+  var KEY = 'lg-tiles.style';
+  var DEF = window.LG_TILES_DEFAULT || 'lens';
+  var SKY = '<defs><linearGradient id="lgsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d1b35"/>' +
+    '<stop offset=".55" stop-color="#5a3f68"/><stop offset=".7" stop-color="#b86c78"/><stop offset=".71" stop-color="#26213b"/>' +
+    '<stop offset="1" stop-color="#121222"/></linearGradient></defs><rect width="160" height="90" fill="url(#lgsky)"/>' +
+    '<text x="9" y="17" fill="#fff" font-size="10" font-family="sans-serif">9:40</text>';
+  var CARDS = [
+    { id: 'lens', name: 'Lens', sub: 'Round icons on a glass shelf',
+      svg: '<rect x="0" y="62" width="160" height="15" fill="rgba(255,255,255,.18)"/>' +
+        '<circle cx="34" cy="64" r="6" fill="#4b5fa8"/><circle cx="50" cy="63" r="7" fill="#3e7d5a"/>' +
+        '<circle cx="67" cy="62" r="8" fill="#b5523b"/><circle cx="80" cy="59" r="11" fill="#2f6f8f" stroke="#fff" stroke-width="1.6"/>' +
+        '<circle cx="97" cy="62" r="8" fill="#8a6a26"/><circle cx="113" cy="63" r="7" fill="#6b5a8e"/><circle cx="128" cy="64" r="6" fill="#56606a"/>' +
+        '<rect x="66" y="40" width="28" height="7" rx="3.5" fill="rgba(14,13,28,.75)"/>' },
+    { id: 'orbit', name: 'Orbit', sub: 'Icons riding a curve',
+      svg: '<path d="M -10 96 Q 80 32 170 96" fill="none" stroke="rgba(255,255,255,.3)"/>' +
+        '<circle cx="30" cy="73" r="6" fill="#4b5fa8"/><circle cx="52" cy="63" r="8" fill="#b5523b"/>' +
+        '<circle cx="80" cy="55" r="12" fill="#2f6f8f" stroke="#fff" stroke-width="1.6"/>' +
+        '<circle cx="108" cy="63" r="8" fill="#8a6a26"/><circle cx="130" cy="73" r="6" fill="#3e7d5a"/>' +
+        '<rect x="64" y="72" width="32" height="5" rx="2.5" fill="rgba(255,255,255,.85)"/>' },
+    { id: 'tilted', name: 'Tilted Tiles', sub: 'Classic LG ribbon tiles',
+      svg: '<g transform="skewX(-8)"><rect x="34" y="52" width="13" height="26" fill="#b5523b"/><rect x="49" y="52" width="13" height="26" fill="#3e7d5a"/>' +
+        '<rect x="64" y="46" width="30" height="33" fill="#2f6f8f" stroke="#fff" stroke-width="1"/><rect x="96" y="52" width="13" height="26" fill="#8a6a26"/>' +
+        '<rect x="111" y="52" width="13" height="26" fill="#6b5a8e"/><rect x="126" y="52" width="13" height="26" fill="#56606a"/></g>' }
+  ];
+  function ok() { return typeof homeStatus !== 'undefined' && homeStatus; }
+  function chosen() {
+    var l = (typeof homeLayout !== 'undefined' && homeLayout) || (ok() && homeStatus.layout);
+    var v = l && l.appNames && l.appNames[KEY];
+    return v || DEF;
+  }
+  // Glasshouse Home is the launcher in use (not a custom one, the bar or LG's).
+  function ghOn() {
+    var st = ok();
+    return !!(st && st.enabled && !st.restorePending && !(st.launchers && st.launchers.chosen) && !(st.bar && st.bar.enabled));
+  }
+  function choose(id) {
+    if (typeof homeWritable === 'function' && !homeWritable()) return;
+    var patch = { appNames: {} };
+    patch.appNames[KEY] = id;
+    Promise.resolve(homeSaveLayout(patch)).then(function () {
+      if (id !== 'none' && !ghOn()) homeChooseMode(true);
+    });
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function cards() {
+    var gh = document.getElementById('home-switch');
+    if (!gh || !ok()) return;
+    var st = homeStatus, style = chosen(), inUse = (typeof t === 'function' ? t('ss.inUse', 'In use') : 'In use');
+    var unavailable = !!st.restorePending || !(st.supported && st.supported.ok);
+    var after = gh;
+    for (var i = 0; i < CARDS.length; i++) {
+      var c = CARDS[i], el = document.getElementById('lg-mode-' + c.id);
+      if (!el) {
+        el = document.createElement('button');
+        el.type = 'button';
+        el.id = 'lg-mode-' + c.id;
+        (function (id) { el.addEventListener('click', function () { choose(id); }); })(c.id);
+      }
+      if (after.nextSibling !== el) after.parentNode.insertBefore(el, after.nextSibling);
+      after = el;
+      var on = ghOn() && style === c.id;
+      el.className = 'hm-card' + (on ? ' on' : '');
+      el.hidden = unavailable;
+      el.disabled = gh.disabled;
+      el.innerHTML = '<span class="hm-screen"><svg class="lg-prev" viewBox="0 0 160 90" aria-hidden="true" preserveAspectRatio="xMidYMid slice">' +
+        SKY + c.svg + '</svg><span class="hm-badge"' + (on ? '' : ' hidden') + '>' + (on ? esc(inUse) : '') + '</span></span>' +
+        '<span class="hm-meta"><span class="hm-name">' + esc(c.name) + '</span><span class="hm-sub">' + esc(c.sub) + '</span></span>';
+    }
+    // Glasshouse Home's own card is "in use" only with its own tiles.
+    if (ghOn() && style !== 'none' && /(^| )on( |$)/.test(gh.className)) {
+      gh.className = gh.className.replace(/(^| )on( |$)/, ' ');
+      var b = gh.querySelector('.hm-badge');
+      if (b) { b.hidden = true; b.textContent = ''; }
+    }
+  }
+  // Glasshouse Home's own card: its own tiles.
+  document.addEventListener('click', function (e) {
+    for (var el = e.target; el && el !== document; el = el.parentNode) {
+      if (el.id === 'home-switch') {
+        if (ok() && !homeStatus.restorePending && chosen() !== 'none') {
+          var patch = { appNames: {} };
+          patch.appNames[KEY] = 'none';
+          if (ghOn()) homeSaveLayout(patch);
+          else setTimeout(function () { homeSaveLayout(patch); }, 0);
+        }
+        return;
+      }
+    }
+  }, true);
+  if (typeof renderHome === 'function') {
+    var orig = renderHome;
+    window.renderHome = function () {
+      var r = orig.apply(this, arguments);
+      try { cards(); } catch (e) {}
+      return r;
+    };
+  }
+  try { cards(); } catch (e) {}
+})();
+</script>

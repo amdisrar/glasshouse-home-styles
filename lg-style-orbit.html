@@ -1,0 +1,158 @@
+<style id="lg-style-orbit">
+/* Tile style: Orbit. The apps ride a gentle curve across the whole width;
+   the one in focus sits in the middle, biggest, with a white ring and its
+   name and live title below. 200 px in focus, about 125 beside it. */
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .wrap{margin:0;padding:0}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .edge{display:none}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .track{display:block;height:480px;
+  -webkit-transform:none !important;transform:none !important}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app{position:absolute;left:0;top:0;width:200px;height:200px;margin:0;padding:0;
+  border-radius:50%;background:#3d4450;outline:0;overflow:visible;text-align:center;opacity:.9;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 10px 22px rgba(0,0,0,.35);
+  will-change:transform,opacity;-webkit-backface-visibility:hidden;backface-visibility:hidden;
+  -webkit-transition:-webkit-transform .38s cubic-bezier(.22,.61,.36,1),opacity .3s ease-out;
+  transition:transform .38s cubic-bezier(.22,.61,.36,1),opacity .3s ease-out}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur{opacity:1}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row.active[data-key="app"] .tile.app.lgo-cur{box-shadow:0 0 0 7px #fff,0 18px 36px rgba(0,0,0,.5)}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row:not(.active)[data-key="app"] .tile.app.lgo-cur{box-shadow:0 0 0 4px rgba(255,255,255,.5),0 14px 30px rgba(0,0,0,.45)}
+/* The icon: a rounded square well inside the circle, whose colour is taken
+   from the icon's own edge, so the two meet without a seam. */
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app>img,
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app>.mono{position:absolute;left:18%;top:18%;width:64%;height:64%;margin:0;border-radius:18%}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app>.mono{line-height:128px;font-size:54px}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app>.fold{position:absolute;left:50%;top:50%;margin:0;
+  -webkit-transform:translate(-50%,-50%) scale(1.1);transform:translate(-50%,-50%) scale(1.1)}
+/* Name and live title under the app in focus only. */
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app>.nm{display:none}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur>.nm{display:block;position:absolute;left:50%;top:100%;width:760px;margin:24px 0 0 -380px;
+  font-family:'Space Grotesk',Inter,sans-serif;font-size:34px;font-weight:600;line-height:1.2;color:#fff;
+  text-shadow:0 2px 8px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app>.lgt{display:none}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur>.lgt{display:block;position:absolute;left:50%;top:100%;width:760px;margin:70px 0 0 -380px;
+  font-size:23px;color:#ece7f4;text-shadow:0 2px 6px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Live apps: the pictures fill the circle while it is the one in focus,
+   and the icon steps down to a badge on the ring. */
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app .lgs{display:none}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app .lgp{position:absolute;left:0;top:0;width:100%;height:100%;border-radius:50%;
+  background:#000 center/cover no-repeat;opacity:0;-webkit-transition:opacity .8s;transition:opacity .8s}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur .lgp.on{opacity:1}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgv.lgo-cur>img{left:auto;top:auto;right:-4px;bottom:-4px;width:62px;height:62px;
+  border-radius:50%;box-shadow:0 0 0 4px #fff;z-index:1}
+/* The curve the apps ride on. */
+html[data-lgstyle="orbit"] .lgo-arc{display:none}
+html[data-lgstyle="orbit"] #stage:not(.cards) .row[data-key="app"] .lgo-arc{display:block;position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+</style>
+<script>
+(function () {
+  if (document.documentElement.getAttribute('data-lgstyle') !== 'orbit') return;
+  // Orbit: places the Apps row's tiles on a curve around the one in focus.
+  var BASE = 200,   // the app in focus, px across
+      STEP = 205,   // from one app to the next along the curve
+      PUSH = 50,    // extra room either side of the app in focus
+      DROP = 18,    // how fast the curve falls away
+      CY = 130,     // the centre line of the app in focus, from the row's top
+      LIFT = 18,    // the app in focus rises above the curve by this much
+      SHOW = 4;     // apps shown either side
+  var lastIx = 0;
+  function has(el, c) { return (' ' + (el.className || '') + ' ').indexOf(' ' + c + ' ') !== -1; }
+  function row() { return document.querySelector('#stage:not(.cards) .row[data-key="app"]'); }
+  function setCls(el, c, want) {
+    var on = has(el, c);
+    if (want && !on) el.className += ' ' + c;
+    else if (!want && on) el.className = (' ' + el.className + ' ').replace(' ' + c + ' ', ' ').replace(/^\s+|\s+$/g, '');
+  }
+  function arc(wrap, track) {
+    var svg = wrap.querySelector('.lgo-arc');
+    if (!svg) {
+      svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'lgo-arc');
+      svg.setAttribute('aria-hidden', 'true');
+      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('fill', 'none'); p.setAttribute('stroke', '#fff');
+      p.setAttribute('stroke-opacity', '0.2'); p.setAttribute('stroke-width', '3');
+      svg.appendChild(p);
+      wrap.insertBefore(svg, wrap.firstChild);
+    }
+    // Wider than the screen, so the curve runs off both edges.
+    var cx = track.offsetLeft + track.clientWidth / 2, span = 1300;
+    var yEnd = CY + DROP * Math.pow(span / (STEP + PUSH / 2), 2), yc = 2 * CY - yEnd;
+    svg.firstChild.setAttribute('d', 'M ' + (cx - span) + ' ' + yEnd + ' Q ' + cx + ' ' + yc + ' ' + (cx + span) + ' ' + yEnd);
+  }
+  function relayout() {
+    var r = row(), track = r && r.querySelector('.track'), wrap = r && r.querySelector('.wrap');
+    if (!track) return;
+    var tiles = track.querySelectorAll('.tile'), cur = -1, i;
+    for (i = 0; i < tiles.length; i++) if (has(tiles[i], 'focus')) { cur = i; break; }
+    if (cur < 0) cur = Math.min(lastIx, tiles.length - 1); else lastIx = cur;
+    var cx = track.clientWidth / 2;
+    for (i = 0; i < tiles.length; i++) {
+      var k = i - cur, a = Math.abs(k), sign = k < 0 ? -1 : 1;
+      var s = k === 0 ? 1 : Math.max(0.42, 0.62 - (a - 1) * 0.06);
+      var x = cx + k * STEP + (k === 0 ? 0 : sign * PUSH);
+      var y = CY + k * k * DROP - (k === 0 ? LIFT : 0);
+      var tf = 'translate3d(' + Math.round(x - BASE / 2) + 'px,' + Math.round(y - BASE / 2) + 'px,0) scale(' + s + ')';
+      if (tiles[i].style.transform !== tf) tiles[i].style.webkitTransform = tiles[i].style.transform = tf;
+      tiles[i].style.opacity = a > SHOW ? '0' : k === 0 ? '' : String(Math.max(0.45, 0.95 - a * 0.12));
+      tiles[i].style.zIndex = String(10 - a);
+      setCls(tiles[i], 'lgo-cur', k === 0);
+    }
+    arc(wrap, track);
+  }
+  window.lgStyleRelayout = relayout;
+
+  // Focus moves by a class on the tiles: follow it.
+  var rows = document.getElementById('rows');
+  if (rows && window.MutationObserver) {
+    new MutationObserver(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        var t = list[i].target;
+        if (t.nodeType === 1 && has(t, 'tile') && /(^| )focus( |$)/.test(t.className) !== /(^| )lgo-cur( |$)/.test(t.className)) return relayout();
+        if (t.nodeType === 1 && has(t, 'row')) return relayout();
+      }
+    }).observe(rows, { attributes: true, attributeFilter: ['class'], subtree: true });
+  }
+
+  /*
+   * The Magic Remote's wheel: Glasshouse scrolls a row with it, which Orbit
+   * does not show, so over the Apps row (or with it in focus and the pointer
+   * elsewhere) each notch moves the focus one app instead, as Left and Right do.
+   */
+  function key(code) {
+    var types = ['keydown', 'keyup'];
+    for (var i = 0; i < types.length; i++) {
+      var ev = document.createEvent('Event');
+      ev.initEvent(types[i], true, true);
+      try {
+        Object.defineProperty(ev, 'keyCode', { get: function () { return code; } });
+        Object.defineProperty(ev, 'which', { get: function () { return code; } });
+        Object.defineProperty(ev, 'key', { get: function () { return code === 37 ? 'ArrowLeft' : 'ArrowRight'; } });
+      } catch (e) {}
+      document.dispatchEvent(ev);
+    }
+  }
+  function inRow(el, key) {
+    for (; el && el.nodeType === 1; el = el.parentNode) {
+      if (el.getAttribute && el.getAttribute('data-key') && has(el, 'row')) return el.getAttribute('data-key') === key ? 1 : -1;
+    }
+    return 0;
+  }
+  var lastWheel = 0;
+  window.addEventListener('onwheel' in document ? 'wheel' : 'mousewheel', function (e) {
+    if (e.lgIdle) return;                   // that notch only woke the screen
+    var r = row();
+    if (!r) return;
+    var where = inRow(e.target, 'app');
+    if (where < 0 || (where === 0 && !has(r, 'active'))) return;
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    var d = e.deltaY !== undefined ? e.deltaY : -e.wheelDelta;
+    if (e.deltaX && Math.abs(e.deltaX) > Math.abs(d || 0)) d = e.deltaX;
+    var now = Date.now();
+    if (!d || now - lastWheel < 90) return;
+    lastWheel = now;
+    key(d > 0 ? 39 : 37);
+  }, { capture: true, passive: false });
+
+  relayout();
+})();
+</script>

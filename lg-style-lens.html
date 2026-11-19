@@ -1,0 +1,153 @@
+<style id="lg-style-lens">
+/* Tile style: Lens. Round icons stand on a frosted glass shelf across the
+   whole width; the one in focus and its neighbours swell as if under a
+   magnifier. 176 px in focus, 141 and 121 beside it, 110 for the rest. */
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .wrap{margin:0;padding:0}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .edge{display:none}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .track{display:block;height:340px;
+  -webkit-transform:none !important;transform:none !important}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app{position:absolute;left:0;top:0;width:176px;height:176px;margin:0;padding:0;
+  border-radius:50%;background:#3d4450;outline:0;overflow:visible;text-align:center;opacity:1;
+  -webkit-transform-origin:50% 100%;transform-origin:50% 100%;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 8px 18px rgba(0,0,0,.35);
+  will-change:transform,opacity;-webkit-backface-visibility:hidden;backface-visibility:hidden;
+  -webkit-transition:-webkit-transform .32s cubic-bezier(.22,.61,.36,1),opacity .25s ease-out;
+  transition:transform .32s cubic-bezier(.22,.61,.36,1),opacity .25s ease-out}
+html[data-lgstyle="lens"] #stage:not(.cards) .row.active[data-key="app"] .tile.app.lgo-cur{box-shadow:0 0 0 6px #fff,0 16px 32px rgba(0,0,0,.5)}
+html[data-lgstyle="lens"] #stage:not(.cards) .row:not(.active)[data-key="app"] .tile.app.lgo-cur{box-shadow:0 0 0 4px rgba(255,255,255,.5),0 12px 26px rgba(0,0,0,.45)}
+/* The icon: a rounded square well inside the circle, whose colour is taken
+   from the icon's own edge, so the two meet without a seam. */
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app>img,
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app>.mono{position:absolute;left:18%;top:18%;width:64%;height:64%;margin:0;border-radius:18%}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app>.mono{line-height:113px;font-size:48px}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app>.fold{position:absolute;left:50%;top:50%;margin:0;
+  -webkit-transform:translate(-50%,-50%);transform:translate(-50%,-50%)}
+/* Name, and live title, in a dark label above the app in focus only. */
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app>.nm,
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app>.lgt{display:none}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur>.nm,
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur>.lgt{display:block;position:absolute;left:50%;bottom:100%;
+  -webkit-transform:translateX(-50%);transform:translateX(-50%);max-width:760px;padding:8px 22px;border-radius:999px;
+  background:rgba(14,13,28,.72);color:#fff;text-shadow:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur>.nm{margin:0 0 22px;font-family:'Space Grotesk',Inter,sans-serif;font-size:30px;font-weight:600;line-height:1.2}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgv.lgo-cur>.nm{margin-bottom:76px}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur>.lgt{margin:0 0 22px;font-size:21px;line-height:1.3;color:#ece7f4}
+/* Live apps: the pictures fill the circle while it is the one in focus,
+   and the icon steps down to a badge on the ring. */
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app .lgs{display:none}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app .lgp{position:absolute;left:0;top:0;width:100%;height:100%;border-radius:50%;
+  background:#000 center/cover no-repeat;opacity:0;-webkit-transition:opacity .8s;transition:opacity .8s}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgo-cur .lgp.on{opacity:1}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .tile.app.lgv.lgo-cur>img{left:auto;top:auto;right:-4px;bottom:-4px;width:56px;height:56px;
+  border-radius:50%;box-shadow:0 0 0 4px #fff;z-index:1}
+/* The glass shelf, edge to edge. */
+html[data-lgstyle="lens"] .lgl-shelf{display:none}
+html[data-lgstyle="lens"] #stage:not(.cards) .row[data-key="app"] .lgl-shelf{display:block;position:absolute;left:0;right:0;height:104px;pointer-events:none;
+  background:rgba(255,255,255,.13);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(255,255,255,.08),0 20px 44px rgba(0,0,0,.3)}
+</style>
+<script>
+(function () {
+  if (document.documentElement.getAttribute('data-lgstyle') !== 'lens') return;
+  // Lens: stands the Apps row's tiles on a shelf, the one in focus in the
+  // middle and magnified, its neighbours less so.
+  var BASE = 176,          // the app in focus, px across
+      SCALE = [1, 0.8, 0.69, 0.625],   // by distance from the app in focus
+      GAP = 30,            // between two apps
+      FOOT = 300,          // where the apps stand, from the row's top
+      EDGE = 40;           // apps closer than this to a screen edge fade out
+  var lastIx = 0;
+  function has(el, c) { return (' ' + (el.className || '') + ' ').indexOf(' ' + c + ' ') !== -1; }
+  function row() { return document.querySelector('#stage:not(.cards) .row[data-key="app"]'); }
+  function setCls(el, c, want) {
+    var on = has(el, c);
+    if (want && !on) el.className += ' ' + c;
+    else if (!want && on) el.className = (' ' + el.className + ' ').replace(' ' + c + ' ', ' ').replace(/^\s+|\s+$/g, '');
+  }
+  function shelf(wrap) {
+    var el = wrap.querySelector('.lgl-shelf');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'lgl-shelf';
+      wrap.insertBefore(el, wrap.firstChild);
+    }
+    el.style.top = (FOOT - 66) + 'px';
+  }
+  function relayout() {
+    var r = row(), track = r && r.querySelector('.track'), wrap = r && r.querySelector('.wrap');
+    if (!track) return;
+    var tiles = track.querySelectorAll('.tile'), cur = -1, i, n = tiles.length;
+    for (i = 0; i < n; i++) if (has(tiles[i], 'focus')) { cur = i; break; }
+    if (cur < 0) cur = Math.min(lastIx, n - 1); else lastIx = cur;
+    var w = track.clientWidth, sc = [], xs = [];
+    for (i = 0; i < n; i++) sc.push(SCALE[Math.min(Math.abs(i - cur), SCALE.length - 1)]);
+    xs[cur] = w / 2;
+    for (i = cur + 1; i < n; i++) xs[i] = xs[i - 1] + BASE * (sc[i - 1] + sc[i]) / 2 + GAP;
+    for (i = cur - 1; i >= 0; i--) xs[i] = xs[i + 1] - BASE * (sc[i + 1] + sc[i]) / 2 - GAP;
+    for (i = 0; i < n; i++) {
+      var a = Math.abs(i - cur), half = BASE * sc[i] / 2;
+      var tf = 'translate3d(' + Math.round(xs[i] - BASE / 2) + 'px,' + (FOOT - BASE) + 'px,0) scale(' + sc[i] + ')';
+      if (tiles[i].style.transform !== tf) tiles[i].style.webkitTransform = tiles[i].style.transform = tf;
+      tiles[i].style.opacity = xs[i] - half < EDGE || xs[i] + half > w - EDGE ? '0' : '';
+      tiles[i].style.zIndex = String(10 - Math.min(a, 9));
+      setCls(tiles[i], 'lgo-cur', a === 0);
+    }
+    shelf(wrap);
+  }
+  window.lgStyleRelayout = relayout;
+
+  // Focus moves by a class on the tiles: follow it.
+  var rows = document.getElementById('rows');
+  if (rows && window.MutationObserver) {
+    new MutationObserver(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        var t = list[i].target;
+        if (t.nodeType === 1 && has(t, 'tile') && /(^| )focus( |$)/.test(t.className) !== /(^| )lgo-cur( |$)/.test(t.className)) return relayout();
+        if (t.nodeType === 1 && has(t, 'row')) return relayout();
+      }
+    }).observe(rows, { attributes: true, attributeFilter: ['class'], subtree: true });
+  }
+
+  /*
+   * The Magic Remote's wheel: Glasshouse scrolls a row with it, which Lens
+   * does not show, so over the Apps row (or with it in focus and the pointer
+   * elsewhere) each notch moves the focus one app instead, as Left and Right do.
+   */
+  function key(code) {
+    var types = ['keydown', 'keyup'];
+    for (var i = 0; i < types.length; i++) {
+      var ev = document.createEvent('Event');
+      ev.initEvent(types[i], true, true);
+      try {
+        Object.defineProperty(ev, 'keyCode', { get: function () { return code; } });
+        Object.defineProperty(ev, 'which', { get: function () { return code; } });
+        Object.defineProperty(ev, 'key', { get: function () { return code === 37 ? 'ArrowLeft' : 'ArrowRight'; } });
+      } catch (e) {}
+      document.dispatchEvent(ev);
+    }
+  }
+  function inRow(el, key) {
+    for (; el && el.nodeType === 1; el = el.parentNode) {
+      if (el.getAttribute && el.getAttribute('data-key') && has(el, 'row')) return el.getAttribute('data-key') === key ? 1 : -1;
+    }
+    return 0;
+  }
+  var lastWheel = 0;
+  window.addEventListener('onwheel' in document ? 'wheel' : 'mousewheel', function (e) {
+    if (e.lgIdle) return;                   // that notch only woke the screen
+    var r = row();
+    if (!r) return;
+    var where = inRow(e.target, 'app');
+    if (where < 0 || (where === 0 && !has(r, 'active'))) return;
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    var d = e.deltaY !== undefined ? e.deltaY : -e.wheelDelta;
+    if (e.deltaX && Math.abs(e.deltaX) > Math.abs(d || 0)) d = e.deltaX;
+    var now = Date.now();
+    if (!d || now - lastWheel < 90) return;
+    lastWheel = now;
+    key(d > 0 ? 39 : 37);
+  }, { capture: true, passive: false });
+
+  relayout();
+})();
+</script>

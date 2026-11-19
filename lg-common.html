@@ -1,0 +1,315 @@
+<style id="lg-tiles">
+/* ---- Home layout: the time alone in the top-left corner, the weather
+   (place and temperature) in the top-right; no date, no Last watched. Sizes
+   are the view's own. */
+#stage #now{display:block;height:262px;padding:0}
+#stage #when{position:absolute;left:96px;top:64px;width:auto;text-align:left}
+#stage #date,#stage #source,#stage #plate{display:none}
+#stage #weather{position:absolute;right:96px;top:64px;margin:0;text-align:right}
+#stage #wxMain{-webkit-justify-content:flex-end;justify-content:flex-end}
+#stage #wxCond{display:none}
+#stage #rows,#stage #rail{-webkit-transition:opacity .6s;transition:opacity .6s}
+</style>
+<style id="lg-idle"></style>
+<script>
+// ---- Which tile style: the one chosen on the dashboard's launcher cards
+// (kept in Glasshouse's own settings, under the app-name key below), else
+// the installer's. The page carries all of them; one is switched on here.
+(function () {
+  var KEY = 'lg-tiles.style', STYLES = { lens: 1, orbit: 1, tilted: 1, none: 1 };
+  var def = STYLES[window.LG_TILES_DEFAULT] ? window.LG_TILES_DEFAULT : 'lens', style = def;
+  try { var kept = localStorage.getItem(KEY); if (STYLES[kept]) style = kept; } catch (e) {}
+  window.LG_STYLE = style;
+  document.documentElement.setAttribute('data-lgstyle', style);
+  // A catalogue with another choice: kept, and the page loaded again in it.
+  window.lgStyleFrom = function (j) {
+    var names = j && j.layout && j.layout.appNames, want = names && names[KEY];
+    if (!STYLES[want]) want = def;
+    if (want === style) return;
+    try { localStorage.setItem(KEY, want); } catch (e) {}
+    var st = document.getElementById('stage');
+    if (!(st && /(^| )arranging( |$)/.test(st.className))) location.reload();
+  };
+  // Glasshouse loads the catalogue again whenever its settings change: read it too.
+  var open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (m, u) {
+    if (/\/api\/home\/catalogue/.test(String(u))) {
+      var x = this;
+      x.addEventListener('load', function () {
+        var j = null;
+        try { j = JSON.parse(x.responseText); } catch (e) {}
+        if (j) window.lgStyleFrom(j);
+      });
+    }
+    return open.apply(this, arguments);
+  };
+})();
+(function () {
+  var NONE = window.LG_STYLE === 'none';
+  // Apps shown as double-width live tiles, by app id.
+  var WIDE = { netflix: 1, amazon: 1, 'youtube.leanback.v4': 1 };
+  var CYCLE_MS = 7000;
+  // Own icons for apps, by app id: PNGs the installer copies from the icons
+  // folder beside it. One that is missing leaves the app's own icon.
+  var ICONS = { 'youtube.leanback.v4': '/assets/lg-icons/youtube.png' };
+  // Each app tile takes the colour round the edge of its own icon, as LG's
+  // ribbon did; icons with no solid background keep the neutral tile.
+  var SEL = 'html[data-lgstyle] #stage:not(.cards) .row[data-key="app"] .tile.app';
+  var css = document.getElementById('lg-tiles');
+  var cache = {}, made = {};
+  var recs = {};      // app id -> [{ title, image }]
+  var pos = {};       // app id -> index of the card on show
+  var cur = {};       // app id -> the card on show
+  function has(el, c) { return !!el && (' ' + (el.className || '') + ' ').indexOf(' ' + c + ' ') !== -1; }
+  function on() { var s = document.getElementById('stage'); return !!s && !has(s, 'cards'); }
+  function tileOf(img) {
+    var t = img.parentNode;
+    if (!t || !has(t, 'tile') || !has(t, 'app')) return null;
+    for (var r = t.parentNode; r && r.nodeType === 1; r = r.parentNode) {
+      if (r.getAttribute('data-key')) return r.getAttribute('data-key') === 'app' ? t : null;
+    }
+    return null;
+  }
+  function appIdOf(img) {
+    var m = /[?&]id=([^&]+)/.exec(img.getAttribute('src') || '');
+    try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; }
+  }
+  function sample(img) {
+    try {
+      var n = 32, cv = document.createElement('canvas');
+      cv.width = n; cv.height = n;
+      var ctx = cv.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(img, 0, 0, n, n);
+      var d = ctx.getImageData(0, 0, n, n).data, r = 0, g = 0, b = 0, k = 0, ring = 0;
+      for (var y = 0; y < n; y++) {
+        for (var x = 0; x < n; x++) {
+          if (x > 2 && y > 2 && x < n - 3 && y < n - 3) continue;
+          ring++;
+          var i = (y * n + x) * 4;
+          if (d[i + 3] < 200) continue;
+          r += d[i]; g += d[i + 1]; b += d[i + 2]; k++;
+        }
+      }
+      if (k < ring * 0.5) return null;
+      return [Math.round(r / k), Math.round(g / k), Math.round(b / k)];
+    } catch (e) { return null; }
+  }
+  function pick(img) {
+    var c = sample(img);
+    if (!c) return has(img, 'dark-ico') ? { hex: 'ece7df', light: true } : null;
+    var hex = ((1 << 24) | (c[0] << 16) | (c[1] << 8) | c[2]).toString(16).slice(1);
+    return { hex: hex, light: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] > 170 };
+  }
+
+  /*
+   * Everything a tile needs that is already known: its colour (from an
+   * earlier load of the same icon), its width and its live pictures. Run the
+   * moment Glasshouse rebuilds the rows, before it measures them, so a
+   * rebuild (coming back to Home, a list refresh) shows no flash.
+   */
+  function decorate(t) {
+    var img = null;
+    for (var k = t.firstChild; k; k = k.nextSibling) if (k.tagName === 'IMG') { img = k; break; }
+    if (!img) return;
+    var id = t.getAttribute('data-lgid') || appIdOf(img);
+    if (id && !t.getAttribute('data-lgid')) t.setAttribute('data-lgid', id);
+    if (ICONS[id] && img.getAttribute('src') !== ICONS[id]) {
+      img.setAttribute('data-lgorig', img.getAttribute('src') || '');
+      img.setAttribute('src', ICONS[id]);
+    }
+    var src = img.getAttribute('src'), c = src && cache[src];
+    if (c && !NONE) {
+      if (!made[c.hex]) {
+        made[c.hex] = true;
+        css.appendChild(document.createTextNode(SEL + '.lgc-' + c.hex + '{background-color:#' + c.hex + '}'));
+      }
+      if (!has(t, 'lgc-' + c.hex)) t.className += ' lgc-' + c.hex + (c.light && !has(t, 'lgv') ? ' lgl' : '');
+    }
+    if (WIDE[id] && !NONE) {
+      t.setAttribute('data-lgapp', id);
+      if (!has(t, 'lgw')) t.className += ' lgw';
+      live(t);
+    }
+  }
+  function decorateAll() {
+    if (!on()) return;
+    var tiles = document.querySelectorAll('.row[data-key="app"] .tile.app');
+    for (var i = 0; i < tiles.length; i++) decorate(tiles[i]);
+    // The chosen tile style places the tiles itself, where it needs to.
+    if (window.lgStyleRelayout) window.lgStyleRelayout();
+  }
+  // An own icon that is not there: back to the app's, for the rest of the visit.
+  document.addEventListener('error', function (e) {
+    var img = e.target;
+    if (!img || img.tagName !== 'IMG' || !img.getAttribute('data-lgorig')) return;
+    for (var k in ICONS) if (ICONS.hasOwnProperty(k) && ICONS[k] === img.getAttribute('src')) delete ICONS[k];
+    img.setAttribute('src', img.getAttribute('data-lgorig'));
+    img.removeAttribute('data-lgorig');
+  }, true);
+  // A new icon: its colour read once, then kept for every later rebuild.
+  document.addEventListener('load', function (e) {
+    var img = e.target;
+    if (!img || img.tagName !== 'IMG' || !on()) return;
+    var t = tileOf(img), src = img.getAttribute('src');
+    if (!t || !src || !img.naturalWidth) return;
+    if (!(src in cache)) cache[src] = pick(img);
+    decorate(t);
+  }, true);
+
+  // ---- wide live tiles
+  function live(t) {
+    var app = t.getAttribute('data-lgapp'), list = recs[app] || [];
+    if (!list.length) return;
+    if (!t.querySelector('.lgp')) {
+      var a = document.createElement('div'), b = document.createElement('div'),
+          sh = document.createElement('div'), tt = document.createElement('div');
+      a.className = 'lgp'; b.className = 'lgp'; sh.className = 'lgs'; tt.className = 'lgt';
+      // A rebuilt tile shows the picture it had at once, without fading in.
+      var card = cur[app];
+      if (card) { a.style.backgroundImage = 'url("' + card.image + '")'; a.className = 'lgp on'; tt.textContent = card.title; }
+      t.insertBefore(sh, t.firstChild); t.insertBefore(b, sh); t.insertBefore(a, b);
+      t.appendChild(tt);
+      t.className = t.className.replace(/ lgl\b/g, '') + ' lgv';
+    }
+    if (!cur[app]) show(app, list[pos[app] || 0]);
+  }
+  // Fades every tile of this app to the card, once its picture has arrived.
+  function show(app, card) {
+    var pic = new Image();
+    pic.onload = function () {
+      cur[app] = card;
+      var tiles = document.querySelectorAll('.row[data-key="app"] .tile.app.lgv[data-lgapp="' + app + '"]');
+      for (var i = 0; i < tiles.length; i++) {
+        var layers = tiles[i].querySelectorAll('.lgp'), tt = tiles[i].querySelector('.lgt');
+        if (layers.length < 2) continue;
+        var was = has(layers[0], 'on') ? 0 : 1, next = layers[1 - was];
+        next.style.backgroundImage = 'url("' + card.image + '")';
+        next.className = 'lgp on';
+        layers[was].className = 'lgp';
+        tt.textContent = card.title;
+      }
+    };
+    pic.src = card.image;
+  }
+  // The apps take turns, half a cycle apart, so they never change together.
+  var turn = 0;
+  setInterval(function () {
+    if (window.lgHomeIdle && window.lgHomeIdle()) return;
+    var apps = [];
+    for (var a in recs) if (recs.hasOwnProperty(a) && recs[a].length > 1) apps.push(a);
+    if (!apps.length) return;
+    var app = apps[turn++ % apps.length];
+    pos[app] = ((pos[app] || 0) + 1) % recs[app].length;
+    show(app, recs[app][pos[app]]);
+  }, Math.round(CYCLE_MS / 2));
+
+  function fetchRecs() {
+    var x = new XMLHttpRequest();
+    x.open('GET', '/api/home/catalogue?t=' + Date.now(), true);
+    x.timeout = 10000;
+    x.onload = function () {
+      var j = null;
+      try { j = JSON.parse(x.responseText); } catch (e) {}
+      if (!j || !j.recommended) return;
+      var next = {};
+      for (var i = 0; i < j.recommended.length; i++) {
+        var r = j.recommended[i];
+        if (!r || !WIDE[r.app] || !r.image) continue;
+        (next[r.app] = next[r.app] || []).push({ title: r.title, image: r.image });
+      }
+      recs = next;
+      for (var a in pos) if (pos.hasOwnProperty(a) && (!recs[a] || pos[a] >= recs[a].length)) pos[a] = 0;
+      decorateAll();
+    };
+    x.send(null);
+  }
+
+  // Hook the rows' rebuild: Glasshouse sets #rows.innerHTML and then
+  // measures the tiles, so the tiles are dressed in between.
+  var rows = document.getElementById('rows');
+  var desc = rows && (Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML') ||
+                      Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerHTML'));
+  if (desc && desc.set && desc.get) {
+    Object.defineProperty(rows, 'innerHTML', {
+      configurable: true,
+      get: function () { return desc.get.call(this); },
+      set: function (h) { desc.set.call(this, h); try { decorateAll(); } catch (e) {} }
+    });
+  } else if (rows && window.MutationObserver) {
+    new MutationObserver(decorateAll).observe(rows, { childList: true });
+  }
+
+  decorateAll();
+  fetchRecs();
+  setInterval(fetchRecs, 5 * 60000);
+})();
+// ---- After 30 seconds with nothing pressed the rows fade out, leaving the
+// wallpaper, time and weather. The first key or click after that only brings
+// them back; moving the pointer brings them back too.
+(function () {
+  var IDLE_MS = 30000;
+  var OVERLAYS = /(^| )(arranging|recents|finding|typing|folder|playing|adding|guiding)( |$)/;
+  var style = document.getElementById('lg-idle');
+  var hidden = false, timer = null, swallowUp = null;
+  window.lgHomeIdle = function () { return hidden; };
+  function hide() {
+    var st = document.getElementById('stage');
+    if (document.hidden || (st && OVERLAYS.test(st.className))) return arm();
+    hidden = true;
+    style.textContent = '#stage #rows,#stage #rail{opacity:0;pointer-events:none}';
+  }
+  function show() {
+    if (hidden) { hidden = false; style.textContent = ''; }
+    arm();
+  }
+  function arm() { clearTimeout(timer); timer = setTimeout(hide, IDLE_MS); }
+  function key(e) {
+    if (!hidden) return arm();
+    swallowUp = e.keyCode;
+    e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    show();
+  }
+  function keyUp(e) {
+    if (swallowUp === null || e.keyCode !== swallowUp) return;
+    swallowUp = null;
+    e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+  }
+  function click(e) {
+    if (!hidden) return arm();
+    e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    show();
+  }
+  // On window and in the capture phase: ahead of Glasshouse's own handlers.
+  window.addEventListener('keydown', key, true);
+  window.addEventListener('keyup', keyUp, true);
+  window.addEventListener('click', click, true);
+  window.addEventListener('mousedown', function (e) { if (hidden) { e.preventDefault(); e.stopPropagation(); } }, true);
+  window.addEventListener('mousemove', show, true);
+  window.addEventListener('onwheel' in document ? 'wheel' : 'mousewheel', function (e) {
+    if (hidden) { e.lgIdle = true; if (e.cancelable) e.preventDefault(); e.stopPropagation(); }
+    show();
+  }, { capture: true, passive: false });
+  // Home pressed, or back from an app: the tiles are there to start with,
+  // and a newer copy of this patch, installed meanwhile, is loaded.
+  var VER = window.LG_TILES_VER || '';
+  function fresh() {
+    // The catalogue too: a tile style chosen on the dashboard meanwhile.
+    var c = new XMLHttpRequest();
+    c.open('GET', '/api/home/catalogue?t=' + Date.now(), true);
+    c.send(null);
+    var x = new XMLHttpRequest();
+    x.open('GET', '/assets/home.html?t=' + Date.now(), true);
+    x.onload = function () {
+      if (x.status !== 200) return;
+      var m = /lg-tiles-version:([0-9a-z-]+)/.exec(x.responseText || '');
+      var st = document.getElementById('stage');
+      if ((m ? m[1] : '') !== VER && !(st && /(^| )arranging( |$)/.test(st.className))) location.reload();
+    };
+    x.send(null);
+  }
+  document.addEventListener('webOSRelaunch', function () { show(); fresh(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { show(); fresh(); } });
+  arm();
+})();
+</script>
